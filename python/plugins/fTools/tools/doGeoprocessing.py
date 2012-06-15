@@ -615,109 +615,75 @@ class geoprocessingThread( QThread ):
     if self.mySelectionA:
       nFeat = self.vlayerA.selectedFeatureCount()
       selectionA = self.vlayerA.selectedFeatures()
-      if not useField:
-        self.emit( SIGNAL( "runStatus(PyQt_PyObject)" ), 0 )
-        self.emit( SIGNAL( "runRange(PyQt_PyObject)" ), ( 0, nFeat ) )
-        first = True
-        for inFeat in selectionA:
-          nElement += 1
-          self.emit( SIGNAL( "runStatus(PyQt_PyObject)" ), nElement )
-          if first:
-            attrs = inFeat.attributeMap()
-            tmpInGeom = QgsGeometry( inFeat.geometry() )
-            outFeat.setGeometry( tmpInGeom )
-            first = False
-          else:
-            tmpInGeom = QgsGeometry( inFeat.geometry() )
-            tmpOutGeom = QgsGeometry( outFeat.geometry() )
-            try:
-              tmpOutGeom = QgsGeometry( tmpOutGeom.combine( tmpInGeom ) )
-              outFeat.setGeometry( tmpOutGeom )
-            except:
-              GEOS_EXCEPT = False
-              continue
-        outFeat.setAttributeMap( attrs )
-        writer.addFeature( outFeat )
-      else:
-        self.emit( SIGNAL( "runStatus(PyQt_PyObject)" ), 0)
-        self.emit( SIGNAL( "runRange(PyQt_PyObject)" ), ( 0, nFeat ) )
 
-        outFeats = {}
-        attrs = {}
-
-        for inFeat in selectionA:
-          nElement += 1
-          self.emit( SIGNAL( "runStatus(PyQt_PyObject)" ),  nElement )
-          atMap = inFeat.attributeMap()
-          tempItem = unicode(atMap[self.myParam].toString().trimmed())
-
-          if not (tempItem in outFeats):
-            outFeats[tempItem] = QgsGeometry(inFeat.geometry())
-            attrs[tempItem] = atMap
-          else:
-            try:
-              outFeats[tempItem] = outFeats[tempItem].combine(inFeat.geometry())
-            except:
-              GEOS_EXCEPT = False
-              continue
-        for k in outFeats.keys():
-          feature = QgsFeature()
-          feature.setAttributeMap(attrs[k])
-          feature.setGeometry(outFeats[k])
-          writer.addFeature( feature )
-    # there is no selection in input layer
+      def getNextFeature():
+        if nElement >= len(selectionA):
+          return False, None
+        else:
+          inFeat = selectionA[nElement]
+          return True, inFeat
     else:
       nFeat = vproviderA.featureCount()
-      if not useField:
-        self.emit( SIGNAL( "runStatus(PyQt_PyObject)" ), 0)
-        self.emit( SIGNAL( "runRange(PyQt_PyObject)" ), ( 0, nFeat ) )
-        first = True
-        while vproviderA.nextFeature( inFeat ):
-          nElement += 1
-          self.emit( SIGNAL( "runStatus(PyQt_PyObject)" ),  nElement )
-          if first:
-            attrs = inFeat.attributeMap()
-            tmpInGeom = QgsGeometry( inFeat.geometry() )
-            outFeat.setGeometry( tmpInGeom )
-            first = False
-          else:
-            tmpInGeom = QgsGeometry( inFeat.geometry() )
-            tmpOutGeom = QgsGeometry( outFeat.geometry() )
-            try:
-              tmpOutGeom = QgsGeometry( tmpOutGeom.combine( tmpInGeom ) )
-              outFeat.setGeometry( tmpOutGeom )
-            except:
-              GEOS_EXCEPT = False
-              continue
-        outFeat.setAttributeMap( attrs )
-        writer.addFeature( outFeat )
-      else:
-        self.emit( SIGNAL( "runStatus(PyQt_PyObject)" ), 0)
-        self.emit( SIGNAL( "runRange(PyQt_PyObject)" ), ( 0, nFeat ) )
 
-        outFeats = {}
-        attrs = {}
+      def getNextFeature():
+        return vproviderA.nextFeature(inFeat), inFeat
 
-        while vproviderA.nextFeature( inFeat ):
-          nElement += 1
-          self.emit( SIGNAL( "runStatus(PyQt_PyObject)" ),  nElement )
-          atMap = inFeat.attributeMap()
-          tempItem = unicode(atMap[self.myParam].toString().trimmed())
+    if not useField:
+      self.emit( SIGNAL( "runStatus(PyQt_PyObject)" ), 0 )
+      self.emit( SIGNAL( "runRange(PyQt_PyObject)" ), ( 0, nFeat ) )
+      first = True
 
-          if not (tempItem in outFeats):
-            outFeats[tempItem] = QgsGeometry(inFeat.geometry())
-            attrs[tempItem] = atMap
-          else:
-            try:
-              outFeats[tempItem] = outFeats[tempItem].combine(inFeat.geometry())
-            except:
-              GEOS_EXCEPT = False
-              continue
-        for k in outFeats.keys():
-          feature = QgsFeature()
-          feature.setAttributeMap(attrs[k])
-          feature.setGeometry(outFeats[k])
-          writer.addFeature( feature )
+      ok, inFeat = getNextFeature()
+      while ok:
+        nElement += 1
+        self.emit( SIGNAL( "runStatus(PyQt_PyObject)" ), nElement )
+        if first:
+          attrs = inFeat.attributeMap()
+          tmpInGeom = QgsGeometry( inFeat.geometry() )
+          outFeat.setGeometry( tmpInGeom )
+          first = False
+        else:
+          tmpInGeom = QgsGeometry( inFeat.geometry() )
+          tmpOutGeom = QgsGeometry( outFeat.geometry() )
+          try:
+            tmpOutGeom = QgsGeometry( tmpOutGeom.combine( tmpInGeom ) )
+            outFeat.setGeometry( tmpOutGeom )
+          except:
+            GEOS_EXCEPT = False
+        ok, inFeat = getNextFeature()
+
+      outFeat.setAttributeMap( attrs )
+      writer.addFeature( outFeat )
+    else:
+      self.emit( SIGNAL( "runStatus(PyQt_PyObject)" ), 0)
+      self.emit( SIGNAL( "runRange(PyQt_PyObject)" ), ( 0, nFeat ) )
+
+      outFeats = {}
+      attrs = {}
+
+      ok, inFeat = getNextFeature()
+      while ok:
+        nElement += 1
+        self.emit( SIGNAL( "runStatus(PyQt_PyObject)" ),  nElement )
+        atMap = inFeat.attributeMap()
+        tempItem = unicode(atMap[self.myParam].toString().trimmed())
+
+        if not (tempItem in outFeats):
+          outFeats[tempItem] = QgsGeometry(inFeat.geometry())
+          attrs[tempItem] = atMap
+        else:
+          try:
+            outFeats[tempItem] = outFeats[tempItem].combine(inFeat.geometry())
+          except:
+            GEOS_EXCEPT = False
+        ok, inFeat = getNextFeature()
+
+      for k in outFeats.keys():
+        feature = QgsFeature()
+        feature.setAttributeMap(attrs[k])
+        feature.setGeometry(outFeats[k])
+        writer.addFeature( feature )
+
     del writer
     return GEOS_EXCEPT, FEATURE_EXCEPT, True, None
 
